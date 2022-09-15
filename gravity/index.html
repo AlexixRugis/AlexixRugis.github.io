@@ -299,7 +299,7 @@
     animate();
 
     canvas.addEventListener(
-      "mousedown",
+      "pointerdown",
       (e) => {
         const pos = getMousePos(canvas, e);
         mousePressX = pos.x;
@@ -310,7 +310,7 @@
     );
 
     canvas.addEventListener(
-      "mousemove",
+      "pointermove",
       (e) => {
         const pos = getMousePos(canvas, e);
         currentMouseX = pos.x;
@@ -322,7 +322,7 @@
     const massesList = document.querySelector("#masses-list");
 
     canvas.addEventListener(
-      "mouseup",
+      "pointerup",
       (e) => {
         const selectedBody = JSON.parse(massesList.value);
         const x = (mousePressX - width / 2) / scale;
