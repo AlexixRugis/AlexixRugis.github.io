@@ -1,3 +1,1 @@
-# gravity.github.io
-
-Для пояснения закона тяготения
+Webpages by AlexixRugis
