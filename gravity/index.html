@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Название страницы</title>
+    <meta name="description" content="Описание страницы" />
+
+    <!-- CSS only -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-iYQeCzEYFbKjA/T2uDLTpkwGzCiq6soy8tYaI1GyVh/UjpbCx/TYkiZhlZB6+fzT"
+      crossorigin="anonymous"
+    />
+    <!-- JavaScript Bundle with Popper -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-u1OknCvxWvY5kfmNBILK2hRnQC3Pr17a+RTT6rIHI7NnikvbZlHgTPOOmMi466C8"
+      crossorigin="anonymous"
+    ></script>
+
+    <!--[if lt IE 9]>
+      <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <!-- As a heading -->
+    <nav class="navbar bg-dark">
+      <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1 text-light"
+          >Webpages by AlexixRugis / Gravity</span
+        >
+      </div>
+    </nav>
+    <main>
+      <section id="controls-wrapper">
+        <label>Масса добавленной планеты</label>
+        <select id="masses-list">
+          <option
+            value='{"name": "Земля", "mass": 0.000003003, "color": "#33e169"}'
+          >
+            Земля
+          </option>
+          <option
+            value='{"name": "Юпитер", "mass": 0.0009543, "color": "#d1b74f"}'
+          >
+            Юпитер
+          </option>
+          <option value='{"name": "Солнце", "mass": 1, "color": "#ffffff"}'>
+            Солнце
+          </option>
+          <option
+            value='{"name": "Красный карлик", "mass": 0.1, "color": "#d60829"}'
+          >
+            Красный карлик
+          </option>
+        </select>
+        <button id="reset-button">Сброс</button>
+      </section>
+      <canvas id="canvas"></canvas>
+      <section></section>
+    </main>
+  </body>
+
+  <script>
+    class nBodyProblem {
+      constructor(params) {
+        this.g = params.g;
+        this.dt = params.dt;
+        this.softeningConstant = params.softeningConstant;
+        this.masses = params.masses;
+      }
+
+      updatePositionVectors() {
+        const massesLen = this.masses.length;
+
+        for (let i = 0; i < massesLen; i++) {
+          const massI = this.masses[i];
+
+          massI.x += massI.vx * this.dt;
+          massI.y += massI.vy * this.dt;
+          massI.z += massI.vz * this.dt;
+        }
+
+        return this;
+      }
+
+      updateVelocityVectors() {
+        const massesLen = this.masses.length;
+
+        for (let i = 0; i < massesLen; i++) {
+          const massI = this.masses[i];
+          massI.vx += massI.ax * this.dt;
+          massI.vy += massI.ay * this.dt;
+          massI.vz += massI.az * this.dt;
+        }
+      }
+
+      updateAccelerationVectors() {
+        const massesLen = this.masses.length;
+
+        for (let i = 0; i < massesLen; i++) {
+          let ax = 0;
+          let ay = 0;
+          let az = 0;
+
+          const massI = this.masses[i];
+
+          for (let j = 0; j < massesLen; j++) {
+            if (i !== j) {
+              const massJ = this.masses[j];
+              const dx = massJ.x - massI.x;
+              const dy = massJ.y - massI.y;
+              const dz = massJ.z - massI.z;
+              const distSq = dx * dx + dy * dy + dz * dz;
+
+              const f =
+                (this.g * massJ.m) /
+                (distSq * Math.sqrt(distSq + this.softeningConstant));
+              ax += dx * f;
+              ay += dy * f;
+              az += dz * f;
+            }
+          }
+
+          massI.ax = ax;
+          massI.ay = ay;
+          massI.az = az;
+        }
+        return this;
+      }
+    }
+
+    const g = 39.5;
+    const dt = 0.008; // 0,008 года равно 2,92 дня
+    const softeningConstant = 0.15;
+
+    const masses = [
+      {
+        name: "Солнце", // в качестве единицы массы используем солнечную
+        color: "#ffffff",
+        m: 1,
+        x: -1.50324727873647e-6,
+        y: -3.93762725944737e-6,
+        z: -4.86567877183925e-8,
+        vx: 3.1669325898331e-5,
+        vy: -6.85489559263319e-6,
+        vz: -7.90076642683254e-7,
+      },
+      // Данные по Меркурию, Венере, Земле и Марсу
+      // можно найти в контейнере Pen к этому уроку
+    ];
+
+    const innerSolarSystem = new nBodyProblem({
+      g,
+      dt,
+      masses: JSON.parse(JSON.stringify(masses)),
+      softeningConstant,
+    });
+
+    class Manifestation {
+      constructor(ctx, trailLength, radius) {
+        this.ctx = ctx;
+
+        this.trailLength = trailLength;
+
+        this.radius = radius;
+
+        this.positions = [];
+      }
+
+      storePosition(x, y) {
+        this.positions.push({ x, y });
+
+        if (this.positions.length > this.trailLength) this.positions.shift();
+      }
+
+      draw(x, y, color) {
+        this.storePosition(x, y);
+
+        const positionsLen = this.positions.length;
+
+        for (let i = 0; i < positionsLen; i++) {
+          let transparency;
+          let circleScaleFactor;
+
+          const scaleFactor = i / positionsLen;
+
+          if (i === positionsLen - 1) {
+            transparency = 1;
+            circleScaleFactor = 1;
+          } else {
+            transparency = scaleFactor / 2;
+            circleScaleFactor = scaleFactor;
+          }
+
+          this.ctx.beginPath();
+          this.ctx.arc(
+            this.positions[i].x,
+            this.positions[i].y,
+            circleScaleFactor * this.radius,
+            0,
+            2 * Math.PI
+          );
+          console.log();
+          this.ctx.fillStyle = `${color}${transparency
+            .toString(16)
+            .substring(2)}`;
+
+          this.ctx.fill();
+        }
+      }
+    }
+
+    const canvas = document.querySelector("#canvas");
+    const ctx = canvas.getContext("2d");
+
+    const width = (canvas.width = window.innerWidth);
+    const height = (canvas.height = window.innerHeight);
+
+    const scale = 70;
+    const radius = 4;
+    const trailLength = 35;
+
+    let mousePressX = 0;
+    let mousePressY = 0;
+
+    let currentMouseX = 0;
+    let currentMouseY = 0;
+
+    let dragging = false;
+
+    const populateManifestations = (masses) => {
+      masses.forEach(
+        (mass) =>
+          (mass["manifestation"] = new Manifestation(ctx, trailLength, radius))
+      );
+    };
+
+    populateManifestations(innerSolarSystem.masses);
+
+    document.querySelector("#reset-button").addEventListener(
+      "click",
+      () => {
+        innerSolarSystem.masses = JSON.parse(JSON.stringify(masses));
+        populateManifestations(innerSolarSystem.masses);
+      },
+      false
+    );
+
+    const getMousePos = (canvas, evt) => {
+      var rect = canvas.getBoundingClientRect(), // abs. size of element
+        scaleX = canvas.width / rect.width, // relationship bitmap vs. element for x
+        scaleY = canvas.height / rect.height; // relationship bitmap vs. element for y
+
+      return {
+        x: (evt.clientX - rect.left) * scaleX, // scale mouse coordinates after they have
+        y: (evt.clientY - rect.top) * scaleY, // been adjusted to be relative to element
+      };
+    };
+
+    const animate = () => {
+      innerSolarSystem
+        .updatePositionVectors()
+        .updateAccelerationVectors()
+        .updateVelocityVectors();
+
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, width, height);
+
+      const massesLen = innerSolarSystem.masses.length;
+
+      for (let i = 0; i < massesLen; i++) {
+        const massI = innerSolarSystem.masses[i];
+
+        const x = width / 2 + massI.x * scale;
+        const y = height / 2 + massI.y * scale;
+
+        massI.manifestation.draw(x, y, massI.color);
+
+        if (massI.name) {
+          ctx.font = "14px Arial";
+          ctx.fillText(massI.name, x + 12, y + 4);
+          ctx.fill();
+        }
+      }
+
+      if (dragging) {
+        ctx.beginPath();
+        ctx.moveTo(mousePressX, mousePressY);
+        ctx.lineTo(currentMouseX, currentMouseY);
+        ctx.strokeStyle = "red";
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    canvas.addEventListener(
+      "mousedown",
+      (e) => {
+        const pos = getMousePos(canvas, e);
+        mousePressX = pos.x;
+        mousePressY = pos.y;
+        dragging = true;
+      },
+      false
+    );
+
+    canvas.addEventListener(
+      "mousemove",
+      (e) => {
+        const pos = getMousePos(canvas, e);
+        currentMouseX = pos.x;
+        currentMouseY = pos.y;
+      },
+      false
+    );
+
+    const massesList = document.querySelector("#masses-list");
+
+    canvas.addEventListener(
+      "mouseup",
+      (e) => {
+        const selectedBody = JSON.parse(massesList.value);
+        const x = (mousePressX - width / 2) / scale;
+        const y = (mousePressY - height / 2) / scale;
+        const z = 0;
+        const pos = getMousePos(canvas, e);
+        const vx = (pos.x - mousePressX) / 35;
+        const vy = (pos.y - mousePressY) / 35;
+        const vz = 0;
+
+        innerSolarSystem.masses.push({
+          name: selectedBody.name,
+          m: selectedBody.mass,
+          color: selectedBody.color,
+          x,
+          y,
+          z,
+          vx,
+          vy,
+          vz,
+          manifestation: new Manifestation(ctx, trailLength, radius),
+        });
+
+        dragging = false;
+      },
+      false
+    );
+  </script>
+</html>
